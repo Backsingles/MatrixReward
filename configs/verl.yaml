@@ -1,0 +1,101 @@
+defaults:
+  - ppo_trainer
+  - _self_
+
+hydra:
+  searchpath:
+    - pkg://verl.trainer.config
+
+algorithm:
+  adv_estimator: grpo
+  norm_adv_by_std_in_grpo: true
+  use_kl_in_reward: false
+
+data:
+  train_files: ["${oc.env:TRAIN_FILE}"]
+  val_files: ["${oc.env:VALIDATION_FILE,${oc.env:TRAIN_FILE}}"]
+  train_batch_size: 16
+  seed: 42
+  dataloader_num_workers: 0
+  max_prompt_length: 3072
+  max_response_length: 2048
+  filter_overlong_prompts: true
+  truncation: right
+  return_raw_chat: true
+  apply_chat_template_kwargs:
+    enable_thinking: false
+  shuffle: false
+  prompt_key: prompt
+
+actor_rollout_ref:
+  model:
+    path: ${oc.env:MODEL_PATH,Qwen/Qwen3-8B}
+    use_remove_padding: false
+    enable_gradient_checkpointing: true
+    override_config:
+      attn_implementation: sdpa
+  actor:
+    optim:
+      lr: 1.0e-6
+    ppo_mini_batch_size: 16
+    ppo_micro_batch_size_per_gpu: 2
+    data_loader_seed: 42
+    entropy_coeff: 0.0
+    use_kl_loss: true
+    kl_loss_coef: 0.001
+    fsdp_config:
+      seed: 42
+      param_offload: false
+      optimizer_offload: false
+  ref:
+    log_prob_micro_batch_size_per_gpu: 2
+  rollout:
+    name: vllm
+    mode: async
+    enforce_eager: true
+    engine_kwargs:
+      vllm:
+        disable_custom_all_reduce: true
+    tensor_model_parallel_size: 1
+    gpu_memory_utilization: 0.55
+    max_model_len: 5120
+    log_prob_micro_batch_size_per_gpu: 2
+    n: 8
+    temperature: 1.0
+    top_p: 1.0
+    calculate_log_probs: true
+    val_kwargs:
+      n: ${actor_rollout_ref.rollout.n}
+    multi_turn:
+      enable: false
+
+reward:
+  num_workers: 8
+  reward_manager:
+    source: importlib
+    name: MatrixRewardManager
+    module:
+      path: ${oc.env:MATRIXREWARD_ROOT}/verl_reward_manager.py
+  custom_reward_function:
+    path: ${oc.env:MATRIXREWARD_ROOT}/verl_reward.py
+    name: compute_score
+    reward_kwargs:
+      num_generations: ${actor_rollout_ref.rollout.n}
+      judge_mode: explicit
+      judge_workers: 16
+      thinking_mode: no-thinking
+      format_reward_weight: 1.0
+
+trainer:
+  val_before_train: false
+  logger: [console]
+  project_name: MatrixReward
+  experiment_name: run
+  nnodes: 1
+  n_gpus_per_node: ${oc.decode:${oc.env:NUM_GPUS,8}}
+  save_freq: 20
+  test_freq: -1
+  total_epochs: 3
+  total_training_steps: 480
+  resume_mode: auto
+  default_local_dir: ${oc.env:OUTPUT_DIR,outputs/run}

@@ -1,0 +1,18 @@
+Compare Response A and Response B independently for every rubric rubrics.
+For each rubrics output A, B, or TIE. Do not infer quality from position,
+length, or formatting alone.
+Return JSON only: {"winners":["A","TIE","B"]}. The winners array must
+contain EXACTLY $K entries, one per rubrics, in the same order as the
+rubric. Do not omit or merge any rubrics.
+
+Query:
+$query
+
+Response A:
+$response_a
+
+Response B:
+$response_b
+
+Rubric:
+$numbered_rubrics

@@ -1,0 +1,17 @@
+You judge two responses on ONE dimension only.
+Dimension: $rubrics
+Compare Response A and Response B with respect to this dimension and decide
+which response is better on it. Base the verdict only on this dimension.
+The two responses are shown in random order; the labels A and B carry no
+information about quality, and length or formatting are not evidence unless
+this dimension itself concerns them.
+Return JSON only: {"winner":"<label, one of A, B, or TIE>"}.
+
+Query:
+$query
+
+Response A:
+$response_a
+
+Response B:
+$response_b
